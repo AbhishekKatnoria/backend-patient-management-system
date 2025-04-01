@@ -1,57 +1,50 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const pool = require("../config/db");
+const User = require("../models/user"); // Rename to 'User' to follow convention
 
-const SECRET_KEY = process.env.JWT_SECRET;
-
-// **Register Super Admin**
-const registerSuperAdmin = async (req, res) => {
-  const { name, email, password } = req.body;
+// Register
+exports.register = async (req, res) => {
   try {
+    const { name, email, password } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
-    const result = await pool.query(
-      "INSERT INTO super_admins (name, email, password) VALUES ($1, $2, $3) RETURNING *",
-      [name, email, hashedPassword]
-    );
-    res.status(201).json({ message: "Super admin registered", user: result.rows[0] });
+    const newUser = await User.create({ name, email, password: hashedPassword });
+
+    res.status(201).json({ message: "User registered successfully", user: newUser });
   } catch (error) {
-    res.status(500).json({ error: "Error registering super admin" });
+    res.status(500).json({ error: error.message });
   }
 };
 
-// **Login Super Admin**
-const loginSuperAdmin = async (req, res) => {
-  const { email, password } = req.body;
+// Login
+exports.login = async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM super_admins WHERE email = $1", [email]);
-    const user = result.rows[0];
+    const { email, password } = req.body;
+    const existingUser = await User.findOne({ where: { email } });
 
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-      return res.status(401).json({ error: "Invalid credentials" });
+    if (!existingUser || !(await bcrypt.compare(password, existingUser.password))) {
+      return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email }, SECRET_KEY, { expiresIn: "1h" });
-    res.cookie("token", token, { httpOnly: true, secure: true, sameSite: "strict" });
+    const token = jwt.sign({ id: existingUser.id }, "secretKey", { expiresIn: "1h" });
     res.json({ message: "Login successful", token });
   } catch (error) {
-    res.status(500).json({ error: "Error logging in" });
+    res.status(500).json({ error: error.message });
   }
 };
 
-// **Logout Super Admin**
-const logoutSuperAdmin = (req, res) => {
-  res.clearCookie("token");
-  res.json({ message: "Logged out successfully" });
-};
-
-// **Get Super Admin Profile**
-const getSuperAdminProfile = async (req, res) => {
+// Get Profile
+exports.getProfile = async (req, res) => {
   try {
-    const result = await pool.query("SELECT id, name, email, created_at FROM super_admins WHERE id = $1", [req.user.id]);
-    res.json(result.rows[0]);
+    const currentUser = await User.findByPk(req.user.id, { attributes: ["id", "name", "email"] });
+    if (!currentUser) return res.status(404).json({ message: "User not found" });
+
+    res.json(currentUser);
   } catch (error) {
-    res.status(401).json({ error: "Unauthorized" });
+    res.status(500).json({ error: error.message });
   }
 };
 
-module.exports = { registerSuperAdmin, loginSuperAdmin, logoutSuperAdmin, getSuperAdminProfile };
+// Logout (Handled on Frontend by Removing Token)
+exports.logout = (req, res) => {
+  res.json({ message: "Logout successful" });
+};
