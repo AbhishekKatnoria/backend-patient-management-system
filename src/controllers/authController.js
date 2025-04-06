@@ -6,7 +6,37 @@ const User = require("../models/user"); // Rename to 'User' to follow convention
 exports.register = async (req, res) => {
   try {
     const { name, email, phone, password } = req.body;
+
+    // Individual field checks with specific messages
+    if (!name) {
+      return res.status(400).json({ error: "Name is required" });
+    }
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+    if (!phone) {
+      return res.status(400).json({ error: "Phone is required" });
+    }
+    if (!password) {
+      return res.status(400).json({ error: "Password is required" });
+    }
+
+    // Email format validation (optional but recommended)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: "Invalid email format" });
+    }
+
+    // Check if the email is already registered
+    const existingUser = await User.findOne({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({ error: "Email already in use" });
+    }
+
+    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create the user
     const newUser = await User.create({
       name,
       email,
