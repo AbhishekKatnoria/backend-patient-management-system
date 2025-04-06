@@ -1,30 +1,27 @@
-const Sequelize = require('sequelize');
-const dotenv = require('dotenv');
-dotenv.config(); 
+const { Sequelize } = require("sequelize");
+const dotenv = require("dotenv");
 
-let password = process.env.DB_PASSWORD || ""; 
-
-// Ensure that password is a string (this step may not be necessary if password is already a string)
-password = password.toString();
+dotenv.config();
 
 const sequelize = new Sequelize(
   process.env.DB_NAME,
   process.env.DB_USER,
-  password,
+  process.env.DB_PASSWORD || "",
   {
     host: process.env.DB_HOST,
-    dialect: 'postgres',
-    logging: false, 
+    dialect: "postgres",
+    logging: false,
   }
 );
 
-// Test the connection (optional but good practice)
-sequelize.authenticate()
-  .then(() => {
-    console.log('Database connection established successfully.');
-  })
-  .catch((err) => {
-    console.log('Unable to connect to the database:', err);
-  });
+// Test connection
+(async () => {
+  try {
+    await sequelize.authenticate();
+    console.log("Database connection established.");
+  } catch (error) {
+    console.error("Unable to connect to the database:", error);
+  }
+})();
 
 module.exports = sequelize;
