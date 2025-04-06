@@ -1,8 +1,8 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
-const authRoutes = require("./routes/authRoutes");
 const sequelize = require("./config/db");
+const authRoutes = require("./routes/authRoutes");
 
 dotenv.config();
 
@@ -10,18 +10,21 @@ const app = express();
 
 // Middlewares
 app.use(cors());
-app.use(express.json()); // for parsing application/json
-app.use(express.urlencoded({ extended: true })); // for parsing application/x-www-form-urlencoded
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use("/auth", authRoutes);
 
-// DB Connection
-sequelize
-  .sync({force: true})
-  .then(() => console.log("Database synced successfully"))
-  .catch((err) => console.error("Error syncing database:", err));
+// Sync DB - only once or when schema changes
+(async () => {
+  try {
+    await sequelize.sync();
+    console.log("✅ Database synced.");
 
-// Start Server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  } catch (error) {
+    console.error("Error syncing database:", error);
+  }
+})();
