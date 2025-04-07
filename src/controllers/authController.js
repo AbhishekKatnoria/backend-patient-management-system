@@ -7,36 +7,42 @@ exports.register = async (req, res) => {
   try {
     const { name, email, phone, password } = req.body;
 
-    // Individual field checks with specific messages
-    if (!name) {
-      return res.status(400).json({ error: "Name is required" });
-    }
-    if (!email) {
-      return res.status(400).json({ error: "Email is required" });
-    }
-    if (!phone) {
-      return res.status(400).json({ error: "Phone is required" });
-    }
-    if (!password) {
-      return res.status(400).json({ error: "Password is required" });
+    const sendResponse = (statusCode, status, payload) =>
+      res.status(statusCode).json({ status, ...payload });
+
+    // Validation: collect errors as array
+    const errors = [];
+    const fields = { name, email, phone, password };
+
+    for (const [key, value] of Object.entries(fields)) {
+      if (!value) {
+        errors.push({
+          message: `${key[0].toUpperCase() + key.slice(1)} is required`,
+        });
+      }
     }
 
-    // Email format validation (optional but recommended)
+    // Email format check (if email exists)
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({ error: "Invalid email format" });
+    if (email && !emailRegex.test(email)) {
+      errors.push({ field: "email", message: "Invalid email format" });
     }
 
-    // Check if the email is already registered
+    // If any validation errors, return them
+    if (errors.length > 0) {
+      return sendResponse(400, false, { errors });
+    }
+
+    // Check for existing email
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
-      return res.status(400).json({ error: "Email already in use" });
+      return sendResponse(400, false, {
+        errors: [{ field: "email", message: "Email already in use" }],
+      });
     }
 
-    // Hash the password
+    // Hash password & create user
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create the user
     const newUser = await User.create({
       name,
       email,
@@ -44,11 +50,17 @@ exports.register = async (req, res) => {
       password: hashedPassword,
     });
 
-    res
-      .status(201)
-      .json({ message: "User registered successfully", user: newUser });
+    const { password: _, ...userWithoutPassword } = newUser.toJSON();
+
+    return sendResponse(201, true, {
+      message: "User registered successfully",
+      user: userWithoutPassword,
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({
+      status: false,
+      errors: [{ field: "server", message: error.message }],
+    });
   }
 };
 
